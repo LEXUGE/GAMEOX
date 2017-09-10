@@ -5,10 +5,10 @@
 #include <string.h>
 #include <stdarg.h>
 
-char a[102][102];
-int wid=0,turn=0,out=0,ny=0,aiturn=3,aix=0,aiy=0;
+char a[101][101];
+int wid=0,turn=0,out=0,ny=0,aiturn=3,aix=0,aiy=0,ai_org_x,ai_org_y;
 int ERROR_CODE=-44;
-int directs[8][2]={
+int directs[24][2]={
   {-1,0},
   {1,0},
   {0,-1},
@@ -17,6 +17,10 @@ int directs[8][2]={
   {-1,1},
   {1,-1},
   {1,1},
+  {2,0},{2,1},{2,2},{1,2},
+  {0,2},{-1,2},{-2,2},{-2,1},
+  {-2,0},{-2,-1},{-2,-2},{-1,-2},
+  {0,-2},{1,-2},{2,-2},{2,-1}
 };
 
 
@@ -24,7 +28,7 @@ void clear();
 int read_file();
 int write_file();
 void clrscr();
-int aifight(int x1,int y1);
+int aifight(int x1,int y1,int org_x,int org_y);
 void ai();
 int scan();
 void fight(int x1,int y1);
@@ -34,6 +38,57 @@ void reset(int x);
 void start();
 int safe_cvrt_num(char raw[100]);
 int safe_get_num(FILE *stream,int n, ...);
+int inMap(int x,int y);
+int process_input(int x,int y,int org_x,int org_y);
+int change_turn();
+int legal_pos(int org_x,int org_y,int x,int y,char ch_flag);
+
+int legal_pos(int org_x,int org_y,int x,int y,char ch_flag)
+{
+  if ((a[org_x][org_y]==ch_flag)&&(abs(org_x-x)<=2)&&(abs(org_y-y)<=2))
+    return 0;
+  return -1;
+}
+
+int change_turn()
+{
+  if ((turn+1)%2==0) turn=0;
+  else turn=1;
+  return 0;
+}
+
+int process_input(int x,int y,int org_x,int org_y)
+{
+  char ch_flag=0;
+  if (turn==0) ch_flag='X';
+  if (turn==1) ch_flag='O';
+  if ((inMap(x,y)==1)&&(inMap(org_x,org_y)==1)) return -1;
+
+  if ((a[x][y]==' ')&&(legal_pos(org_x,org_y,x,y,ch_flag)==0))
+  {
+    if ((abs(org_x-x)<=1)&&(abs(org_y-y)<=1))
+    {
+      a[x][y]=ch_flag;
+      fight(x,y);
+      return 0;
+    }
+    if ((abs(org_x-x)==2)||(abs(org_y-y)==2))
+    {
+      a[x][y]=ch_flag;
+      a[org_x][org_y]=' ';
+      fight(x,y);
+      return 0;
+    }
+  }
+  return -1;
+}
+
+int inMap(int x,int y)
+{
+	if (x<1||x>wid||y<1||y>wid)
+		return 1;
+	return 0;
+}
 
 int safe_get_num(FILE *stream,int n, ...)
 {
@@ -91,8 +146,8 @@ int safe_cvrt_num(char raw[100])
 void clear()
 {
   int i=0,j=0;
-  for (i=0;i<=101;i++)
-    for (j=0;j<=101;j++)
+  for (i=0;i<=100;i++)
+    for (j=0;j<=100;j++)
       a[i][j]='!';
 }
 
@@ -207,7 +262,7 @@ void clrscr()
   printf("\033c");
 }
 
-int aifight(int x1,int y1)
+int aifight(int x1,int y1,int org_x,int org_y)
 {
   int sum=0,i=0;
   char ch_flag=0;
@@ -215,15 +270,16 @@ int aifight(int x1,int y1)
   else ch_flag='X';
 
   for (i=0;i<8;i++)
-    if (a[x1+directs[i][0]][y1+directs[i][1]]==ch_flag)
-      sum++;
-
+    if (inMap(x1+directs[i][0],y1+directs[i][1])==0)
+      if (a[x1+directs[i][0]][y1+directs[i][1]]==ch_flag)
+        sum++;
+  if ((abs(org_x-x1)==2)||(abs(org_y-y1)==2)) sum--;
   return sum;
 }
 
 void ai()
 {
-  int i=0,j=0,sum=0,max=-1,max_x=0,max_y=0,k=0;
+  int i=0,j=0,sum=0,max=-1,k=0;
   char ch_flag=0;
   if (aiturn==0) ch_flag='X';
   if (aiturn==1) ch_flag='O';
@@ -232,21 +288,22 @@ void ai()
   	{
   	  if (a[i][j]==ch_flag)
       {
-        for (k=0;k<4;k++)
-          if (a[i+directs[k][0]][j+directs[k][1]]==' ')
-          {
-            sum=aifight(i+directs[k][0],j+directs[k][1]);
-            if (sum>max)
+        for (k=0;k<24;k++)
+          if (inMap(i+directs[k][0],j+directs[k][1])==0)
+            if (a[i+directs[k][0]][j+directs[k][1]]==' ')
             {
-              max=sum;
-              max_x=i+directs[k][0];
-              max_y=j+directs[k][1];
+              sum=aifight(i+directs[k][0],j+directs[k][1],i,j);
+              if (sum>max)
+              {
+                max=sum;
+                aix=i+directs[k][0];
+                aiy=j+directs[k][1];
+                ai_org_x=i;
+                ai_org_y=j;
+              }
             }
-          }
       }
   	}
-  aix=max_x;
-  aiy=max_y;
 }
 
 int scan()
@@ -256,12 +313,13 @@ int scan()
   for (i=1;i<=wid;i++)
   	for (j=1;j<=wid;j++)
   	{
-      for (k=0;k<4;k++)
-        if (a[i+directs[k][0]][j+directs[k][1]]==' ')
-        {
-          if (a[i][j]=='X') t1=1;
-          if (a[i][j]=='O') t2=1;
-        }
+      for (k=0;k<24;k++)
+        if (inMap(i+directs[k][0],j+directs[k][1])==0)
+          if (a[i+directs[k][0]][j+directs[k][1]]==' ')
+          {
+            if (a[i][j]=='X') t1=1;
+            if (a[i][j]=='O') t2=1;
+          }
       if (a[i][j]=='X') x++;
       if (a[i][j]=='O') o++;
   	}
@@ -287,8 +345,9 @@ void fight(int x1,int y1)
   if (turn==0) {ch_flag='O';another_ch_flag='X';}
   else {ch_flag='X';another_ch_flag='O';}
   for (i=0;i<8;i++)
-    if (a[x1+directs[i][0]][y1+directs[i][1]]==ch_flag)
-      a[x1+directs[i][0]][y1+directs[i][1]]=another_ch_flag;
+    if (inMap(x1+directs[i][0],y1+directs[i][1])==0)
+      if (a[x1+directs[i][0]][y1+directs[i][1]]==ch_flag)
+        a[x1+directs[i][0]][y1+directs[i][1]]=another_ch_flag;
 }
 
 void display(int n)
@@ -343,55 +402,34 @@ void display(int n)
 
 void game()
 {
-  int x=0,y=0,t=0;
-  int ch=0;
-  while (1)
-  {
-    x=-5;
-    y=-5;
-  	clrscr();
-  	display(wid);
-  	if (turn==0) printf("Now is X\n");
-  	else printf("Now is O\n");
-    if (turn!=aiturn)
-    {
-      printf("please input two numbers of x,y:");
-      safe_get_num(stdin,2,&x,&y);
-    }
-    else
-    {
-      printf("AI!\n");ai();x=aix;y=aiy;
-      printf("AI's x=%d y=%d\n",aix,aiy);
-      printf("Input any key to continue\n");
-      getchar();
-      while ((ch=getchar())!='\n'&&ch!=EOF);
-    }
-  	if ((x==0)&&(y==0)) {if ((turn+1)%2==0) turn=0; else turn=1;return;}
-    if ((x==-1)&&(y==-1)) {read_file();if (scan()==1) out=1;return;}
-    if ((x==-2)&&(y==-2)) {write_file();if (scan()==1) out=1;return;}
-  	if ((x==-3)&&(y==-3)) {out=1;return;}
+  int org_x=0,org_y=0,x=0,y=0,ch=0;
 
-    if (((x>=1)&&(x<=wid))&&((y>=1)&&(y<=wid)))
-      if (a[x][y]==' ')
-    	{
-    	  if ((turn==0)&&((a[x-1][y]=='X')||(a[x][y-1]=='X')||(a[x][y+1]=='X')||(a[x+1][y]=='X')))
-        {
-          t=1;
-          a[x][y]='X';
-          fight(x,y);
-        }
-    	  if ((turn==1)&&((a[x-1][y]=='O')||(a[x][y-1]=='O')||(a[x][y+1]=='O')||(a[x+1][y]=='O')))
-        {
-          t=1;
-          a[x][y]='O';
-          fight(x,y);
-        }
-    	  if (t==1) break;
-    	}
+  x=-5;y=-5;org_x=-5;org_y=-5;
+	clrscr();
+	display(wid);
+	if (turn==0) printf("Now is X\n");
+	else printf("Now is O\n");
+  if (turn!=aiturn)
+  {
+    printf("please input four numbers of original_x,original_y,x,y:");
+    safe_get_num(stdin,4,&org_x,&org_y,&x,&y);
   }
+  else
+  {
+    printf("AI!\n");ai();
+    x=aix;y=aiy;
+    org_x=ai_org_x;org_y=ai_org_y;
+    printf("AI's original_x=%d original_y=%d x=%d y=%d\n",ai_org_x,ai_org_y,aix,aiy);
+    printf("Input any key to continue\n");
+    getchar();
+    while ((ch=getchar())!='\n'&&ch!=EOF);
+  }
+	if ((x==0)&&(y==0)&&(org_x==0)&&(org_y==0)) {change_turn();return;}
+  if ((x==-1)&&(y==-1)&&(org_x==-1)&&(org_y==-1)) {read_file();if (scan()==1) out=1;return;}
+  if ((x==-2)&&(y==-2)&&(org_x==-2)&&(org_y==-2)) {write_file();if (scan()==1) out=1;return;}
+	if ((x==-3)&&(y==-3)&&(org_x==-3)&&(org_y==-3)) {out=1;return;}
+  if (process_input(x,y,org_x,org_y)==0) change_turn();
   if (scan()==1) {out=1;return;}
-  if ((turn+1)%2==0) turn=0;
-  else turn=1;
 }
 void reset(int x)
 {
@@ -399,9 +437,9 @@ void reset(int x)
   for (i=1;i<=x;i++)
   	for (j=1;j<=x;j++)
   	  a[i][j]=' ';
-  a[1][1]='O';
+  a[1][1]='X';
   a[1][x]='O';
-  a[x][1]='X';
+  a[x][1]='O';
   a[x][x]='X';
 }
 void start()
