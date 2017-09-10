@@ -62,7 +62,7 @@ int process_input(int x,int y,int org_x,int org_y)
   char ch_flag=0;
   if (turn==0) ch_flag='X';
   if (turn==1) ch_flag='O';
-  if ((inMap(x,y)==1)&&(inMap(org_x,org_y)==1)) return -1;
+  if ((inMap(x,y)==1)||(inMap(org_x,org_y)==1)) return -1;
 
   if ((a[x][y]==' ')&&(legal_pos(org_x,org_y,x,y,ch_flag)==0))
   {
