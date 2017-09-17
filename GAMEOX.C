@@ -36,7 +36,7 @@ void display(int n);
 void game();
 void reset(int x);
 void start();
-int safe_cvrt_num(char raw[100]);
+int safe_cvrt_num(char *raw);
 int safe_get_num(FILE *stream,int n, ...);
 int inMap(int x,int y);
 int process_input(int x,int y,int org_x,int org_y);
@@ -92,10 +92,10 @@ int inMap(int x,int y)
 
 int safe_get_num(FILE *stream,int n, ...)
 {
-  int *targets[100];
+  int *targets[100]={NULL};
   int temp=0,num=0,count=-1,i=0;
   char raw[100]={0};
-  char *last,*p;
+  char *last=NULL,*p=NULL;
   int ch=0;
 
   num=n;
@@ -111,14 +111,8 @@ int safe_get_num(FILE *stream,int n, ...)
   if (raw[strlen(raw)-1]!='\n')
     while ((ch=fgetc(stream))!='\n'&&ch!=EOF);
   if (strcmp(raw,"")==0) return ERROR_CODE;
-  temp=safe_cvrt_num(strtok_r(raw," ",&last));
-  if (temp!=ERROR_CODE)
-  {
-    count++;
-    *targets[count]=temp;
-  }
-  if (count==num-1) return count+1;
-  while ((p=strtok_r(NULL," ",&last))!=NULL)
+  p=strtok_r(raw," ",&last);
+  while (p!=NULL)
   {
     temp=safe_cvrt_num(p);
     if (temp!=ERROR_CODE)
@@ -127,13 +121,14 @@ int safe_get_num(FILE *stream,int n, ...)
       *targets[count]=temp;
       if (count==num-1) break;
     }
+    p=strtok_r(NULL," ",&last);
   }
   return count+1;
 }
 
-int safe_cvrt_num(char raw[100])
+int safe_cvrt_num(char *raw)
 {
-  char *endptr;
+  char *endptr=NULL;
   long val=0;
   errno=0;
   val=strtol(raw,&endptr,10);
